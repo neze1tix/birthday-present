@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Home() {
@@ -9,6 +9,16 @@ export default function Home() {
     const [stars, setStars] = useState([]);
     const [mounted, setMounted] = useState(false);
     const [hover, setHover] = useState(false);
+    const [showCake, setShowCake] = useState(false);
+    const [candlesLit, setCandlesLit] = useState([true, true, true, true, true]);
+    const [blowPower, setBlowPower] = useState(0);
+    const [micActive, setMicActive] = useState(false);
+    const [micPermission, setMicPermission] = useState(null);
+
+    const audioContextRef = useRef(null);
+    const analyserRef = useRef(null);
+    const sourceRef = useRef(null);
+    const animationFrameRef = useRef(null);
 
     useEffect(() => {
         setMounted(true);
@@ -24,6 +34,86 @@ export default function Home() {
         }
         setStars(newStars);
     }, []);
+
+    // Эффект для показа торта после открытия подарка
+    useEffect(() => {
+        if (isOpen) {
+            setTimeout(() => {
+                setShowCake(true);
+            }, 1500);
+        } else {
+            setShowCake(false);
+            setCandlesLit([true, true, true, true, true]);
+            setMicActive(false);
+            if (audioContextRef.current) {
+                audioContextRef.current.close();
+            }
+        }
+    }, [isOpen]);
+
+    // Запрос доступа к микрофону и настройка анализа звука
+    const requestMicAccess = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            setMicPermission(true);
+
+            // Создаем аудио контекст
+            audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+            analyserRef.current = audioContextRef.current.createAnalyser();
+            analyserRef.current.fftSize = 256;
+
+            sourceRef.current = audioContextRef.current.createMediaStreamSource(stream);
+            sourceRef.current.connect(analyserRef.current);
+
+            setMicActive(true);
+
+            // Запускаем анализ звука
+            const bufferLength = analyserRef.current.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            const checkBlow = () => {
+                if (!analyserRef.current || !micActive) return;
+
+                analyserRef.current.getByteFrequencyData(dataArray);
+
+                // Вычисляем среднюю громкость
+                let sum = 0;
+                for (let i = 0; i < bufferLength; i++) {
+                    sum += dataArray[i];
+                }
+                const average = sum / bufferLength;
+
+                // Нормализуем значение (0-1)
+                const normalized = Math.min(average / 200, 1);
+                setBlowPower(normalized);
+
+                // Если дуют сильно, гасим свечи
+                if (normalized > 0.3) {
+                    setCandlesLit(prev => {
+                        // Если все свечи уже погашены, ничего не делаем
+                        if (prev.every(v => !v)) return prev;
+
+                        // Гасим по одной свече в зависимости от силы дутья
+                        const firstLitIndex = prev.findIndex(v => v);
+                        if (firstLitIndex !== -1) {
+                            const newCandles = [...prev];
+                            newCandles[firstLitIndex] = false;
+                            return newCandles;
+                        }
+                        return prev;
+                    });
+                }
+
+                animationFrameRef.current = requestAnimationFrame(checkBlow);
+            };
+
+            checkBlow();
+
+        } catch (err) {
+            console.error('Микрофон не доступен:', err);
+            setMicPermission(false);
+        }
+    };
 
     const openGift = () => {
         setIsOpen(true);
@@ -156,7 +246,7 @@ export default function Home() {
                     С Днём Рождения,<br />Папа!
                 </motion.h1>
 
-                {/* Весь подарок целиком (коробка + крышка) */}
+                {/* Весь подарок целиком */}
                 <motion.div
                     onHoverStart={() => setHover(true)}
                     onHoverEnd={() => setHover(false)}
@@ -205,7 +295,6 @@ export default function Home() {
                                     position: 'relative',
                                     boxShadow: '0 10px 20px rgba(0,0,0,0.3)',
                                 }}>
-                                    {/* Золотой бант на крышке */}
                                     <div style={{
                                         position: 'absolute',
                                         top: '50%',
@@ -266,7 +355,6 @@ export default function Home() {
                         filter: isOpen ? 'brightness(0.8)' : 'none',
                         transition: 'filter 0.3s',
                     }}>
-                        {/* Коробка */}
                         <div style={{
                             width: '100%',
                             aspectRatio: '1/1',
@@ -279,7 +367,6 @@ export default function Home() {
                             overflow: 'hidden',
                             transition: 'box-shadow 0.3s',
                         }}>
-                            {/* Блестящая текстура */}
                             <div style={{
                                 position: 'absolute',
                                 top: 0,
@@ -289,7 +376,6 @@ export default function Home() {
                                 background: 'radial-gradient(circle at 20% 30%, rgba(255,255,255,0.2) 0%, transparent 50%)',
                             }} />
 
-                            {/* Вертикальная лента */}
                             <div style={{
                                 position: 'absolute',
                                 left: '50%',
@@ -308,7 +394,6 @@ export default function Home() {
                                 }} />
                             </div>
 
-                            {/* Горизонтальная лента */}
                             <div style={{
                                 position: 'absolute',
                                 top: '50%',
@@ -327,7 +412,6 @@ export default function Home() {
                                 }} />
                             </div>
 
-                            {/* Центральный бант */}
                             <div style={{
                                 position: 'absolute',
                                 top: '50%',
@@ -390,7 +474,6 @@ export default function Home() {
                                 </div>
                             </div>
 
-                            {/* Текст "Открыть" */}
                             {!isOpen && (
                                 <motion.div
                                     animate={{
@@ -431,6 +514,206 @@ export default function Home() {
                         </div>
                     </div>
                 </motion.div>
+
+                {/* Торт со свечами - появляется после открытия подарка */}
+                <AnimatePresence>
+                    {showCake && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 50 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 50 }}
+                            transition={{ duration: 0.8, type: 'spring', bounce: 0.4 }}
+                            style={{
+                                marginTop: '50px',
+                                width: '100%',
+                                maxWidth: '500px',
+                            }}
+                        >
+                            {/* Индикатор дутья */}
+                            {micActive && (
+                                <div style={{
+                                    width: '100%',
+                                    height: '10px',
+                                    background: 'rgba(255,255,255,0.2)',
+                                    borderRadius: '10px',
+                                    marginBottom: '20px',
+                                    overflow: 'hidden',
+                                }}>
+                                    <motion.div
+                                        animate={{ width: `${blowPower * 100}%` }}
+                                        style={{
+                                            height: '100%',
+                                            background: 'linear-gradient(90deg, #FFD700, #FFA500)',
+                                            borderRadius: '10px',
+                                        }}
+                                    />
+                                </div>
+                            )}
+
+                            {/* Кнопка для запроса микрофона */}
+                            {micPermission === null && !micActive && (
+                                <motion.button
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={requestMicAccess}
+                                    style={{
+                                        background: 'linear-gradient(135deg, #FFD700, #FFA500)',
+                                        color: '#1a1a2e',
+                                        border: 'none',
+                                        padding: '15px 30px',
+                                        fontSize: '1.2rem',
+                                        fontWeight: 'bold',
+                                        borderRadius: '50px',
+                                        cursor: 'pointer',
+                                        marginBottom: '30px',
+                                        boxShadow: '0 10px 25px rgba(0,0,0,0.3), 0 0 20px gold',
+                                    }}
+                                >
+                                    🎤 Разрешить микрофон (чтобы тушить свечи)
+                                </motion.button>
+                            )}
+
+                            {/* Сам торт */}
+                            <div style={{
+                                position: 'relative',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                            }}>
+                                {/* Свечи */}
+                                <div style={{
+                                    display: 'flex',
+                                    gap: '15px',
+                                    marginBottom: '10px',
+                                    zIndex: 5,
+                                }}>
+                                    {candlesLit.map((isLit, index) => (
+                                        <motion.div
+                                            key={index}
+                                            initial={{ y: -20, opacity: 0 }}
+                                            animate={{ y: 0, opacity: 1 }}
+                                            transition={{ delay: index * 0.1 }}
+                                            style={{
+                                                position: 'relative',
+                                                width: '25px',
+                                                height: '80px',
+                                            }}
+                                        >
+                                            {/* Свеча */}
+                                            <div style={{
+                                                width: '25px',
+                                                height: '60px',
+                                                background: 'linear-gradient(135deg, #87CEEB, #4169E1)',
+                                                borderRadius: '5px 5px 0 0',
+                                                position: 'absolute',
+                                                bottom: 0,
+                                                boxShadow: '0 5px 15px rgba(0,0,0,0.3)',
+                                            }}>
+                                                {/* Фитиль */}
+                                                <div style={{
+                                                    width: '4px',
+                                                    height: '8px',
+                                                    background: '#333',
+                                                    position: 'absolute',
+                                                    top: '-4px',
+                                                    left: '50%',
+                                                    transform: 'translateX(-50%)',
+                                                }} />
+                                            </div>
+
+                                            {/* Огонь (если свеча горит) */}
+                                            {isLit && (
+                                                <motion.div
+                                                    animate={{
+                                                        scale: [1, 1.2, 1],
+                                                        opacity: [0.8, 1, 0.8],
+                                                    }}
+                                                    transition={{
+                                                        duration: 0.3,
+                                                        repeat: Infinity,
+                                                    }}
+                                                    style={{
+                                                        width: '20px',
+                                                        height: '30px',
+                                                        background: 'radial-gradient(circle at 30% 30%, #FFD700, #FF4500)',
+                                                        borderRadius: '50% 50% 20% 20%',
+                                                        position: 'absolute',
+                                                        top: '-25px',
+                                                        left: '2px',
+                                                        filter: 'blur(1px)',
+                                                        boxShadow: '0 0 20px #FFA500',
+                                                    }}
+                                                />
+                                            )}
+                                        </motion.div>
+                                    ))}
+                                </div>
+
+                                {/* Торт (ярусы) */}
+                                <div style={{
+                                    width: '100%',
+                                    background: 'linear-gradient(135deg, #D2691E, #8B4513)',
+                                    borderRadius: '20px 20px 10px 10px',
+                                    padding: '20px',
+                                    boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+                                    position: 'relative',
+                                    zIndex: 2,
+                                }}>
+                                    {/* Крем */}
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: -10,
+                                        left: 0,
+                                        right: 0,
+                                        height: '20px',
+                                        background: 'repeating-linear-gradient(45deg, #FFFDD0, #FFFDD0 10px, #F0E68C 10px, #F0E68C 20px)',
+                                        borderRadius: '10px 10px 0 0',
+                                    }} />
+
+                                    {/* Вишенка */}
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: -15,
+                                        left: '50%',
+                                        transform: 'translateX(-50%)',
+                                        width: '30px',
+                                        height: '30px',
+                                        background: 'radial-gradient(circle at 30% 30%, #FF0000, #8B0000)',
+                                        borderRadius: '50%',
+                                        boxShadow: '0 5px 10px rgba(0,0,0,0.3)',
+                                    }} />
+
+                                    <p style={{
+                                        textAlign: 'center',
+                                        color: '#FFFDD0',
+                                        fontSize: '1.5rem',
+                                        fontWeight: 'bold',
+                                        textShadow: '2px 2px 4px rgba(0,0,0,0.5)',
+                                    }}>
+                                        🎂 С Днём Рождения! 🎂
+                                    </p>
+                                </div>
+
+                                {/* Сообщение о потушенных свечах */}
+                                {candlesLit.every(v => !v) && (
+                                    <motion.p
+                                        initial={{ opacity: 0, scale: 0 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        style={{
+                                            marginTop: '20px',
+                                            color: '#FFD700',
+                                            fontSize: '1.5rem',
+                                            fontWeight: 'bold',
+                                            textShadow: '0 0 20px gold',
+                                        }}
+                                    >
+                                        ✨ Желание загадано! ✨
+                                    </motion.p>
+                                )}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
                 {/* Подсказка */}
                 {!isOpen && (
@@ -553,8 +836,8 @@ export default function Home() {
                                             lineHeight: 1.6,
                                             color: 'rgba(255,255,255,0.9)',
                                         }}>
-                                            Спасибо за то что ты рядом и всегда<br />
-                                            стараешься мне помочь
+                                            Спасибо за твою заботу, тепло и поддержку.<br />
+                                            Ты всегда рядом и это бесценно.
                                         </p>
 
                                         <p style={{
@@ -576,7 +859,7 @@ export default function Home() {
                                             WebkitBackgroundClip: 'text',
                                             WebkitTextFillColor: 'transparent',
                                         }}>
-                                            ❤️ Я ТЕБЯ ЛЮБЛЮ! ❤️
+                                            ❤️ Я ТЕБЯ ОЧЕНЬ ЛЮБЛЮ! ❤️
                                         </p>
                                     </motion.div>
 
@@ -619,20 +902,20 @@ export default function Home() {
 
             {/* Стили */}
             <style jsx>{`
-                @keyframes fall {
-                    to {
-                        transform: translateY(100vh) rotate(360deg);
-                    }
-                }
-                @keyframes twinkle {
-                    0%, 100% { opacity: 0.2; }
-                    50% { opacity: 0.8; }
-                }
-                @keyframes sparkle {
-                    0%, 100% { opacity: 0; transform: scale(0); }
-                    50% { opacity: 1; transform: scale(1); }
-                }
-            `}</style>
+        @keyframes fall {
+          to {
+            transform: translateY(100vh) rotate(360deg);
+          }
+        }
+        @keyframes twinkle {
+          0%, 100% { opacity: 0.2; }
+          50% { opacity: 0.8; }
+        }
+        @keyframes sparkle {
+          0%, 100% { opacity: 0; transform: scale(0); }
+          50% { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
         </div>
     );
 }
