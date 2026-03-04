@@ -14,6 +14,10 @@ export default function Home() {
     const [blowPower, setBlowPower] = useState(0);
     const [micActive, setMicActive] = useState(false);
     const [micPermission, setMicPermission] = useState(null);
+    const [micDevices, setMicDevices] = useState([]);
+    const [selectedMic, setSelectedMic] = useState('');
+    const [audioStream, setAudioStream] = useState(null);
+    const [micError, setMicError] = useState('');
 
     const audioContextRef = useRef(null);
     const analyserRef = useRef(null);
@@ -48,28 +52,69 @@ export default function Home() {
             if (audioContextRef.current) {
                 audioContextRef.current.close();
             }
+            if (audioStream) {
+                audioStream.getTracks().forEach(track => track.stop());
+            }
         }
-    }, [isOpen]);
+    }, [isOpen, audioStream]);
 
-    // Запрос доступа к микрофону и настройка анализа звука
+    // Получение списка микрофонов
+    const getMicDevices = async () => {
+        try {
+            setMicError('');
+            // Сначала запрашиваем разрешение
+            const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+
+            // Получаем список устройств
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const mics = devices.filter(device => device.kind === 'audioinput');
+            setMicDevices(mics);
+
+            if (mics.length > 0) {
+                setSelectedMic(mics[0].deviceId);
+            }
+
+            // Закрываем временный стрим
+            stream.getTracks().forEach(track => track.stop());
+
+        } catch (err) {
+            console.error('Ошибка получения устройств:', err);
+            setMicError('Не удалось получить список микрофонов. Разреши доступ к микрофону.');
+        }
+    };
+
+    // Запрос доступа к микрофону
     const requestMicAccess = async () => {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            setMicError('');
+            console.log('Запрашиваем доступ к микрофону...');
+
+            const constraints = {
+                audio: selectedMic ? {deviceId: {exact: selectedMic}} : true
+            };
+
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            console.log('✅ Микрофон получен!');
+            setAudioStream(stream);
             setMicPermission(true);
 
             // Создаем аудио контекст
             audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+            await audioContextRef.current.resume();
+            console.log('✅ AudioContext запущен');
+
             analyserRef.current = audioContextRef.current.createAnalyser();
             analyserRef.current.fftSize = 256;
+            analyserRef.current.smoothingTimeConstant = 0.8;
 
             sourceRef.current = audioContextRef.current.createMediaStreamSource(stream);
             sourceRef.current.connect(analyserRef.current);
 
             setMicActive(true);
 
-            // Запускаем анализ звука
             const bufferLength = analyserRef.current.frequencyBinCount;
             const dataArray = new Uint8Array(bufferLength);
+            let lastBlowTime = 0;
 
             const checkBlow = () => {
                 if (!analyserRef.current || !micActive) return;
@@ -83,17 +128,17 @@ export default function Home() {
                 }
                 const average = sum / bufferLength;
 
-                // Нормализуем значение (0-1)
-                const normalized = Math.min(average / 200, 1);
+                // Нормализуем (0-1)
+                const normalized = Math.min(average / 150, 1);
                 setBlowPower(normalized);
 
-                // Если дуют сильно, гасим свечи
-                if (normalized > 0.3) {
-                    setCandlesLit(prev => {
-                        // Если все свечи уже погашены, ничего не делаем
-                        if (prev.every(v => !v)) return prev;
+                // Гасим свечи при достаточно сильном звуке
+                const now = Date.now();
+                if (normalized > 0.15 && now - lastBlowTime > 300) {
+                    console.log('💨 ДУЕМ! Сила:', normalized.toFixed(3));
+                    lastBlowTime = now;
 
-                        // Гасим по одной свече в зависимости от силы дутья
+                    setCandlesLit(prev => {
                         const firstLitIndex = prev.findIndex(v => v);
                         if (firstLitIndex !== -1) {
                             const newCandles = [...prev];
@@ -110,7 +155,8 @@ export default function Home() {
             checkBlow();
 
         } catch (err) {
-            console.error('Микрофон не доступен:', err);
+            console.error('❌ Ошибка микрофона:', err);
+            setMicError('Ошибка доступа к микрофону: ' + err.message);
             setMicPermission(false);
         }
     };
@@ -140,7 +186,7 @@ export default function Home() {
                 width: '100%',
                 minHeight: '100vh',
                 background: 'radial-gradient(circle at 20% 20%, #2b1b3a, #0f0c1f)',
-            }} />
+            }}/>
         );
     }
 
@@ -197,10 +243,10 @@ export default function Home() {
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.4 }}
+                        initial={{opacity: 0}}
+                        animate={{opacity: 1}}
+                        exit={{opacity: 0}}
+                        transition={{duration: 0.4}}
                         style={{
                             position: 'fixed',
                             top: 0,
@@ -227,9 +273,9 @@ export default function Home() {
             }}>
                 {/* Заголовок */}
                 <motion.h1
-                    initial={{ y: -50, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ duration: 0.8, type: 'spring', bounce: 0.4 }}
+                    initial={{y: -50, opacity: 0}}
+                    animate={{y: 0, opacity: 1}}
+                    transition={{duration: 0.8, type: 'spring', bounce: 0.4}}
                     style={{
                         fontSize: 'clamp(2.5rem, 10vw, 6rem)',
                         fontWeight: 900,
@@ -243,7 +289,7 @@ export default function Home() {
                         lineHeight: 1.2,
                     }}
                 >
-                    С Днём Рождения,<br />Папа!
+                    С Днём Рождения,<br/>Папа!
                 </motion.h1>
 
                 {/* Весь подарок целиком */}
@@ -257,7 +303,7 @@ export default function Home() {
                         rotate: 0,
                         scale: 1
                     }}
-                    transition={{ duration: 0.5 }}
+                    transition={{duration: 0.5}}
                     style={{
                         position: 'relative',
                         width: '100%',
@@ -275,7 +321,7 @@ export default function Home() {
                                     y: -250,
                                     rotate: 25,
                                     opacity: 0,
-                                    transition: { duration: 0.8, type: 'spring', bounce: 0.3 }
+                                    transition: {duration: 0.8, type: 'spring', bounce: 0.3}
                                 }}
                                 style={{
                                     position: 'absolute',
@@ -319,7 +365,7 @@ export default function Home() {
                                                 background: 'linear-gradient(135deg, #FFD700, #B8860B)',
                                                 borderRadius: '50%',
                                                 boxShadow: 'inset 0 2px 5px rgba(255,255,255,0.5)',
-                                            }} />
+                                            }}/>
                                             <div style={{
                                                 position: 'absolute',
                                                 right: '-25px',
@@ -330,7 +376,7 @@ export default function Home() {
                                                 background: 'linear-gradient(135deg, #FFD700, #B8860B)',
                                                 borderRadius: '50%',
                                                 boxShadow: 'inset 0 2px 5px rgba(255,255,255,0.5)',
-                                            }} />
+                                            }}/>
                                             <div style={{
                                                 position: 'absolute',
                                                 top: '-20px',
@@ -341,7 +387,7 @@ export default function Home() {
                                                 background: 'radial-gradient(circle at 30% 30%, #FFF, #FFD700)',
                                                 borderRadius: '50%',
                                                 boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
-                                            }} />
+                                            }}/>
                                         </div>
                                     </div>
                                 </div>
@@ -374,7 +420,7 @@ export default function Home() {
                                 right: 0,
                                 bottom: 0,
                                 background: 'radial-gradient(circle at 20% 30%, rgba(255,255,255,0.2) 0%, transparent 50%)',
-                            }} />
+                            }}/>
 
                             <div style={{
                                 position: 'absolute',
@@ -391,7 +437,7 @@ export default function Home() {
                                     position: 'absolute',
                                     inset: 0,
                                     background: 'repeating-linear-gradient(90deg, transparent, transparent 10px, rgba(255,255,255,0.2) 10px, rgba(255,255,255,0.2) 20px)',
-                                }} />
+                                }}/>
                             </div>
 
                             <div style={{
@@ -409,7 +455,7 @@ export default function Home() {
                                     position: 'absolute',
                                     inset: 0,
                                     background: 'repeating-linear-gradient(180deg, transparent, transparent 10px, rgba(255,255,255,0.2) 10px, rgba(255,255,255,0.2) 20px)',
-                                }} />
+                                }}/>
                             </div>
 
                             <div style={{
@@ -437,7 +483,7 @@ export default function Home() {
                                         background: 'linear-gradient(135deg, #FFD700, #B8860B)',
                                         borderRadius: '50%',
                                         boxShadow: 'inset 0 3px 10px rgba(255,255,255,0.5)',
-                                    }} />
+                                    }}/>
                                     <div style={{
                                         position: 'absolute',
                                         right: '-30px',
@@ -448,7 +494,7 @@ export default function Home() {
                                         background: 'linear-gradient(135deg, #FFD700, #B8860B)',
                                         borderRadius: '50%',
                                         boxShadow: 'inset 0 3px 10px rgba(255,255,255,0.5)',
-                                    }} />
+                                    }}/>
                                     <div style={{
                                         position: 'absolute',
                                         top: '-25px',
@@ -459,7 +505,7 @@ export default function Home() {
                                         background: 'radial-gradient(circle at 30% 30%, #FFF, #FFD700)',
                                         borderRadius: '50%',
                                         boxShadow: '0 8px 15px rgba(0,0,0,0.2)',
-                                    }} />
+                                    }}/>
                                     <div style={{
                                         position: 'absolute',
                                         bottom: '-25px',
@@ -470,7 +516,7 @@ export default function Home() {
                                         background: 'radial-gradient(circle at 30% 30%, #FFF, #FFD700)',
                                         borderRadius: '50%',
                                         boxShadow: '0 8px 15px rgba(0,0,0,0.2)',
-                                    }} />
+                                    }}/>
                                 </div>
                             </div>
 
@@ -515,62 +561,157 @@ export default function Home() {
                     </div>
                 </motion.div>
 
-                {/* Торт со свечами - появляется после открытия подарка */}
+                {/* Торт со свечами */}
                 <AnimatePresence>
                     {showCake && (
                         <motion.div
-                            initial={{ opacity: 0, y: 50 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 50 }}
-                            transition={{ duration: 0.8, type: 'spring', bounce: 0.4 }}
+                            initial={{opacity: 0, y: 50}}
+                            animate={{opacity: 1, y: 0}}
+                            exit={{opacity: 0, y: 50}}
+                            transition={{duration: 0.8, type: 'spring', bounce: 0.4}}
                             style={{
                                 marginTop: '50px',
                                 width: '100%',
                                 maxWidth: '500px',
                             }}
                         >
-                            {/* Индикатор дутья */}
-                            {micActive && (
+                            {/* Панель микрофона */}
+                            {!micActive && micPermission !== false && (
                                 <div style={{
-                                    width: '100%',
-                                    height: '10px',
-                                    background: 'rgba(255,255,255,0.2)',
-                                    borderRadius: '10px',
-                                    marginBottom: '20px',
-                                    overflow: 'hidden',
+                                    background: 'rgba(0,0,0,0.3)',
+                                    backdropFilter: 'blur(10px)',
+                                    borderRadius: '30px',
+                                    padding: '20px',
+                                    marginBottom: '30px',
+                                    border: '1px solid rgba(255,215,0,0.3)',
                                 }}>
-                                    <motion.div
-                                        animate={{ width: `${blowPower * 100}%` }}
-                                        style={{
-                                            height: '100%',
-                                            background: 'linear-gradient(90deg, #FFD700, #FFA500)',
-                                            borderRadius: '10px',
-                                        }}
-                                    />
+                                    {/* Выбор микрофона */}
+                                    {micDevices.length === 0 ? (
+                                        <motion.button
+                                            whileHover={{scale: 1.05}}
+                                            whileTap={{scale: 0.95}}
+                                            onClick={getMicDevices}
+                                            style={{
+                                                background: 'linear-gradient(135deg, #FFD700, #FFA500)',
+                                                color: '#1a1a2e',
+                                                border: 'none',
+                                                padding: '12px 25px',
+                                                fontSize: '1rem',
+                                                fontWeight: 'bold',
+                                                borderRadius: '50px',
+                                                cursor: 'pointer',
+                                                width: '100%',
+                                                boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
+                                            }}
+                                        >
+                                            🎤 Найти микрофоны
+                                        </motion.button>
+                                    ) : (
+                                        <>
+                                            <select
+                                                value={selectedMic}
+                                                onChange={(e) => setSelectedMic(e.target.value)}
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '12px 20px',
+                                                    fontSize: '1rem',
+                                                    borderRadius: '50px',
+                                                    border: '2px solid #FFD700',
+                                                    background: 'rgba(255,255,255,0.1)',
+                                                    color: 'white',
+                                                    marginBottom: '15px',
+                                                    cursor: 'pointer',
+                                                }}
+                                            >
+                                                {micDevices.map(mic => (
+                                                    <option key={mic.deviceId} value={mic.deviceId}
+                                                            style={{background: '#1a1a2e'}}>
+                                                        {mic.label || `Микрофон ${micDevices.indexOf(mic) + 1}`}
+                                                    </option>
+                                                ))}
+                                            </select>
+
+                                            <motion.button
+                                                whileHover={{scale: 1.05}}
+                                                whileTap={{scale: 0.95}}
+                                                onClick={requestMicAccess}
+                                                style={{
+                                                    background: 'linear-gradient(135deg, #FFD700, #FFA500)',
+                                                    color: '#1a1a2e',
+                                                    border: 'none',
+                                                    padding: '12px 25px',
+                                                    fontSize: '1rem',
+                                                    fontWeight: 'bold',
+                                                    borderRadius: '50px',
+                                                    cursor: 'pointer',
+                                                    width: '100%',
+                                                    boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
+                                                }}
+                                            >
+                                                ✅ Активировать выбранный микрофон
+                                            </motion.button>
+                                        </>
+                                    )}
+
+                                    {/* Ошибка */}
+                                    {micError && (
+                                        <p style={{
+                                            color: '#ff6b6b',
+                                            marginTop: '15px',
+                                            fontSize: '0.9rem',
+                                            textAlign: 'center',
+                                        }}>
+                                            {micError}
+                                        </p>
+                                    )}
                                 </div>
                             )}
 
-                            {/* Кнопка для запроса микрофона */}
-                            {micPermission === null && !micActive && (
-                                <motion.button
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    onClick={requestMicAccess}
-                                    style={{
-                                        background: 'linear-gradient(135deg, #FFD700, #FFA500)',
-                                        color: '#1a1a2e',
-                                        border: 'none',
-                                        padding: '15px 30px',
-                                        fontSize: '1.2rem',
-                                        fontWeight: 'bold',
-                                        borderRadius: '50px',
-                                        cursor: 'pointer',
-                                        marginBottom: '30px',
-                                        boxShadow: '0 10px 25px rgba(0,0,0,0.3), 0 0 20px gold',
-                                    }}
-                                >
-                                    🎤 Разрешить микрофон (чтобы тушить свечи)
-                                </motion.button>
+                            {/* Индикатор громкости */}
+                            {micActive && (
+                                <div style={{
+                                    background: 'rgba(0,0,0,0.3)',
+                                    backdropFilter: 'blur(10px)',
+                                    borderRadius: '30px',
+                                    padding: '15px 20px',
+                                    marginBottom: '30px',
+                                    border: '1px solid rgba(255,215,0,0.3)',
+                                }}>
+                                    <div style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        marginBottom: '10px',
+                                        color: '#FFD700',
+                                    }}>
+                                        <span>🎤 Громкость</span>
+                                        <span>{Math.round(blowPower * 100)}%</span>
+                                    </div>
+                                    <div style={{
+                                        width: '100%',
+                                        height: '20px',
+                                        background: 'rgba(255,255,255,0.1)',
+                                        borderRadius: '10px',
+                                        overflow: 'hidden',
+                                    }}>
+                                        <motion.div
+                                            animate={{width: `${blowPower * 100}%`}}
+                                            style={{
+                                                height: '100%',
+                                                background: 'linear-gradient(90deg, #FFD700, #FFA500)',
+                                                borderRadius: '10px',
+                                                boxShadow: '0 0 20px gold',
+                                            }}
+                                        />
+                                    </div>
+                                    <p style={{
+                                        color: 'rgba(255,255,255,0.6)',
+                                        fontSize: '0.9rem',
+                                        marginTop: '10px',
+                                        textAlign: 'center',
+                                    }}>
+                                        Дуй в микрофон чтобы задуть свечи! 💨
+                                    </p>
+                                </div>
                             )}
 
                             {/* Сам торт */}
@@ -590,9 +731,9 @@ export default function Home() {
                                     {candlesLit.map((isLit, index) => (
                                         <motion.div
                                             key={index}
-                                            initial={{ y: -20, opacity: 0 }}
-                                            animate={{ y: 0, opacity: 1 }}
-                                            transition={{ delay: index * 0.1 }}
+                                            initial={{y: -20, opacity: 0}}
+                                            animate={{y: 0, opacity: 1}}
+                                            transition={{delay: index * 0.1}}
                                             style={{
                                                 position: 'relative',
                                                 width: '25px',
@@ -618,7 +759,7 @@ export default function Home() {
                                                     top: '-4px',
                                                     left: '50%',
                                                     transform: 'translateX(-50%)',
-                                                }} />
+                                                }}/>
                                             </div>
 
                                             {/* Огонь (если свеча горит) */}
@@ -649,7 +790,7 @@ export default function Home() {
                                     ))}
                                 </div>
 
-                                {/* Торт (ярусы) */}
+                                {/* Торт */}
                                 <div style={{
                                     width: '100%',
                                     background: 'linear-gradient(135deg, #D2691E, #8B4513)',
@@ -668,7 +809,7 @@ export default function Home() {
                                         height: '20px',
                                         background: 'repeating-linear-gradient(45deg, #FFFDD0, #FFFDD0 10px, #F0E68C 10px, #F0E68C 20px)',
                                         borderRadius: '10px 10px 0 0',
-                                    }} />
+                                    }}/>
 
                                     {/* Вишенка */}
                                     <div style={{
@@ -681,7 +822,7 @@ export default function Home() {
                                         background: 'radial-gradient(circle at 30% 30%, #FF0000, #8B0000)',
                                         borderRadius: '50%',
                                         boxShadow: '0 5px 10px rgba(0,0,0,0.3)',
-                                    }} />
+                                    }}/>
 
                                     <p style={{
                                         textAlign: 'center',
@@ -697,8 +838,8 @@ export default function Home() {
                                 {/* Сообщение о потушенных свечах */}
                                 {candlesLit.every(v => !v) && (
                                     <motion.p
-                                        initial={{ opacity: 0, scale: 0 }}
-                                        animate={{ opacity: 1, scale: 1 }}
+                                        initial={{opacity: 0, scale: 0}}
+                                        animate={{opacity: 1, scale: 1}}
                                         style={{
                                             marginTop: '20px',
                                             color: '#FFD700',
@@ -718,9 +859,9 @@ export default function Home() {
                 {/* Подсказка */}
                 {!isOpen && (
                     <motion.p
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 0.7 }}
-                        transition={{ delay: 1 }}
+                        initial={{opacity: 0}}
+                        animate={{opacity: 0.7}}
+                        transition={{delay: 1}}
                         style={{
                             position: 'absolute',
                             bottom: '30px',
@@ -750,9 +891,9 @@ export default function Home() {
                         pointerEvents: 'none',
                     }}>
                         <motion.div
-                            initial={{ opacity: 0, scale: 0.3 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.3 }}
+                            initial={{opacity: 0, scale: 0.3}}
+                            animate={{opacity: 1, scale: 1}}
+                            exit={{opacity: 0, scale: 0.3}}
                             transition={{
                                 type: 'spring',
                                 bounce: 0.5,
@@ -792,11 +933,11 @@ export default function Home() {
                                     />
                                 ))}
 
-                                <div style={{ position: 'relative', zIndex: 10 }}>
+                                <div style={{position: 'relative', zIndex: 10}}>
                                     <motion.h2
-                                        initial={{ y: 30, opacity: 0 }}
-                                        animate={{ y: 0, opacity: 1 }}
-                                        transition={{ delay: 0.5 }}
+                                        initial={{y: 30, opacity: 0}}
+                                        animate={{y: 0, opacity: 1}}
+                                        transition={{delay: 0.5}}
                                         style={{
                                             fontSize: 'clamp(2rem, 6vw, 4rem)',
                                             fontWeight: 900,
@@ -813,9 +954,9 @@ export default function Home() {
                                     </motion.h2>
 
                                     <motion.div
-                                        initial={{ y: 30, opacity: 0 }}
-                                        animate={{ y: 0, opacity: 1 }}
-                                        transition={{ delay: 0.7 }}
+                                        initial={{y: 30, opacity: 0}}
+                                        animate={{y: 0, opacity: 1}}
+                                        transition={{delay: 0.7}}
                                         style={{
                                             textAlign: 'center',
                                             color: '#fff',
@@ -827,7 +968,7 @@ export default function Home() {
                                             fontWeight: 'bold',
                                             textShadow: '0 2px 10px rgba(0,0,0,0.3)',
                                         }}>
-                                            <span style={{ color: '#FFD700' }}>Папа!</span> Ты лучший!
+                                            <span style={{color: '#FFD700'}}>Папа!</span> Ты лучший!
                                         </p>
 
                                         <p style={{
@@ -836,7 +977,7 @@ export default function Home() {
                                             lineHeight: 1.6,
                                             color: 'rgba(255,255,255,0.9)',
                                         }}>
-                                            Спасибо за твою заботу, тепло и поддержку.<br />
+                                            Спасибо за твою заботу, тепло и поддержку.<br/>
                                             Ты всегда рядом и это бесценно.
                                         </p>
 
@@ -847,7 +988,7 @@ export default function Home() {
                                             fontWeight: 'bold',
                                             textShadow: '0 0 15px rgba(255,215,0,0.5)',
                                         }}>
-                                            Крепкого здоровья, счастья<br />
+                                            Крепкого здоровья, счастья<br/>
                                             и исполнения всех желаний!
                                         </p>
 
@@ -864,9 +1005,9 @@ export default function Home() {
                                     </motion.div>
 
                                     <motion.button
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: 1 }}
+                                        initial={{opacity: 0, y: 20}}
+                                        animate={{opacity: 1, y: 0}}
+                                        transition={{delay: 1}}
                                         onClick={() => setIsOpen(false)}
                                         style={{
                                             background: 'linear-gradient(135deg, #FFD700, #FFA500)',
@@ -902,20 +1043,32 @@ export default function Home() {
 
             {/* Стили */}
             <style jsx>{`
-        @keyframes fall {
-          to {
-            transform: translateY(100vh) rotate(360deg);
-          }
-        }
-        @keyframes twinkle {
-          0%, 100% { opacity: 0.2; }
-          50% { opacity: 0.8; }
-        }
-        @keyframes sparkle {
-          0%, 100% { opacity: 0; transform: scale(0); }
-          50% { opacity: 1; transform: scale(1); }
-        }
-      `}</style>
+                @keyframes fall {
+                    to {
+                        transform: translateY(100vh) rotate(360deg);
+                    }
+                }
+
+                @keyframes twinkle {
+                    0%, 100% {
+                        opacity: 0.2;
+                    }
+                    50% {
+                        opacity: 0.8;
+                    }
+                }
+
+                @keyframes sparkle {
+                    0%, 100% {
+                        opacity: 0;
+                        transform: scale(0);
+                    }
+                    50% {
+                        opacity: 1;
+                        transform: scale(1);
+                    }
+                }
+            `}</style>
         </div>
     );
 }
