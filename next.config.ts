@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'export',
-  basePath: 'birthday-present', // Замени на название твоего репозитория!
+  basePath: '/birthday-present', // ТОЧНОЕ название твоего репозитория!
   images: {
     unoptimized: true,
   },
