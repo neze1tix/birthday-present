@@ -1,11 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'export',
-  basePath: '/birthday-present',
+  basePath: '/birthday-present', // Название вашего репозитория
   images: {
     unoptimized: true,
   },
-  trailingSlash: true, // Добавь эту строку!
+  trailingSlash: true,
 };
 
 module.exports = nextConfig;
