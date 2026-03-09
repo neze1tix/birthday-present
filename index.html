@@ -73,6 +73,7 @@
             max-width: 600px;
             cursor: pointer;
             transition: transform 0.3s;
+            margin-bottom: 50px;
         }
 
         .gift-wrapper:hover:not(.open) {
@@ -265,6 +266,178 @@
             50% { transform: scale(1.15); opacity: 1; }
         }
 
+        /* Торт */
+        .cake-section {
+            margin-top: 50px;
+            width: 100%;
+            max-width: 500px;
+            display: none;
+        }
+
+        .cake-section.show {
+            display: block;
+        }
+
+        .mic-panel {
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+            border-radius: 30px;
+            padding: 20px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255,215,0,0.3);
+        }
+
+        .mic-button {
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            color: #1a1a2e;
+            border: none;
+            padding: 12px 25px;
+            font-size: 1rem;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            width: 100%;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            transition: transform 0.2s;
+        }
+
+        .mic-button:hover {
+            transform: scale(1.05);
+        }
+
+        .mic-select {
+            width: 100%;
+            padding: 12px 20px;
+            font-size: 1rem;
+            border-radius: 50px;
+            border: 2px solid #FFD700;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            margin-bottom: 15px;
+            cursor: pointer;
+        }
+
+        .mic-select option {
+            background: #1a1a2e;
+        }
+
+        .meter {
+            width: 100%;
+            height: 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .meter-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #FFD700, #FFA500);
+            border-radius: 10px;
+            box-shadow: 0 0 20px gold;
+            width: 0%;
+            transition: width 0.1s;
+        }
+
+        .candles {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+
+        .candle {
+            position: relative;
+            width: 25px;
+            height: 80px;
+        }
+
+        .candle-body {
+            width: 25px;
+            height: 60px;
+            background: linear-gradient(135deg, #87CEEB, #4169E1);
+            border-radius: 5px 5px 0 0;
+            position: absolute;
+            bottom: 0;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .wick {
+            width: 4px;
+            height: 8px;
+            background: #333;
+            position: absolute;
+            top: -4px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .flame {
+            width: 20px;
+            height: 30px;
+            background: radial-gradient(circle at 30% 30%, #FFD700, #FF4500);
+            border-radius: 50% 50% 20% 20%;
+            position: absolute;
+            top: -25px;
+            left: 2px;
+            filter: blur(1px);
+            box-shadow: 0 0 20px #FFA500;
+            animation: flicker 0.3s infinite;
+        }
+
+        @keyframes flicker {
+            0%, 100% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.2); opacity: 1; }
+        }
+
+        .cake {
+            width: 100%;
+            background: linear-gradient(135deg, #D2691E, #8B4513);
+            border-radius: 20px 20px 10px 10px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        .icing {
+            position: absolute;
+            top: -10px;
+            left: 0;
+            right: 0;
+            height: 20px;
+            background: repeating-linear-gradient(45deg, #FFFDD0, #FFFDD0 10px, #F0E68C 10px, #F0E68C 20px);
+            border-radius: 10px 10px 0 0;
+        }
+
+        .cherry {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 30px;
+            height: 30px;
+            background: radial-gradient(circle at 30% 30%, #FF0000, #8B0000);
+            border-radius: 50%;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.3);
+        }
+
+        .cake-text {
+            text-align: center;
+            color: #FFFDD0;
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .wish-message {
+            margin-top: 20px;
+            color: #FFD700;
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-shadow: 0 0 20px gold;
+            text-align: center;
+        }
+
         .congrats {
             position: fixed;
             top: 50%;
@@ -381,6 +554,46 @@
             </div>
         </div>
 
+        <!-- Торт (появляется после открытия) -->
+        <div class="cake-section" id="cakeSection">
+            <!-- Панель микрофона -->
+            <div class="mic-panel" id="micPanel">
+                <button class="mic-button" id="findMicsBtn" onclick="findMics()">🎤 Найти микрофоны</button>
+                <div id="micSelectDiv" style="display: none;">
+                    <select class="mic-select" id="micSelect"></select>
+                    <button class="mic-button" onclick="activateMic()">✅ Активировать микрофон</button>
+                </div>
+                <div id="micError" style="color: #ff6b6b; margin-top: 10px; text-align: center;"></div>
+            </div>
+
+            <!-- Индикатор громкости -->
+            <div id="meterPanel" style="display: none;">
+                <div style="display: flex; justify-content: space-between; color: #FFD700; margin-bottom: 5px;">
+                    <span>🎤 Громкость</span>
+                    <span id="percent">0%</span>
+                </div>
+                <div class="meter">
+                    <div class="meter-fill" id="meterFill"></div>
+                </div>
+                <p style="color: rgba(255,255,255,0.6); text-align: center; margin: 10px 0;">Дуй в микрофон чтобы задуть свечи! 💨</p>
+            </div>
+
+            <!-- Свечи -->
+            <div class="candles" id="candles">
+                <!-- Свечи создаются через JS -->
+            </div>
+
+            <!-- Торт -->
+            <div class="cake">
+                <div class="icing"></div>
+                <div class="cherry"></div>
+                <div class="cake-text">🎂 С Днём Рождения! 🎂</div>
+            </div>
+
+            <!-- Сообщение о желании -->
+            <div class="wish-message" id="wishMessage" style="display: none;">✨ Желание загадано! ✨</div>
+        </div>
+
         <div class="hint" id="hint">Нажми на подарок 🎁</div>
     </div>
 
@@ -409,12 +622,28 @@
             starsContainer.appendChild(star);
         }
 
+        // Создание свечей
+        const candlesContainer = document.getElementById('candles');
+        for (let i = 0; i < 5; i++) {
+            const candle = document.createElement('div');
+            candle.className = 'candle';
+            candle.id = `candle${i}`;
+            candle.innerHTML = `
+                <div class="candle-body">
+                    <div class="wick"></div>
+                </div>
+                <div class="flame" id="flame${i}"></div>
+            `;
+            candlesContainer.appendChild(candle);
+        }
+
         const giftWrapper = document.getElementById('giftWrapper');
         const lid = document.getElementById('lid');
         const openText = document.getElementById('openText');
         const hint = document.getElementById('hint');
         const congrats = document.getElementById('congrats');
         const overlay = document.getElementById('overlay');
+        const cakeSection = document.getElementById('cakeSection');
 
         let isOpen = false;
 
@@ -433,11 +662,129 @@
                 overlay.classList.add('show');
                 congrats.classList.add('show');
             }, 500);
+
+            // Показываем торт через 1.5 секунды
+            setTimeout(() => {
+                cakeSection.classList.add('show');
+            }, 1500);
         });
 
         window.closeCongrats = function() {
             overlay.classList.remove('show');
             congrats.classList.remove('show');
+        };
+
+        // Микрофон
+        let audioContext;
+        let analyser;
+        let source;
+        let stream;
+        let animationFrame;
+        let micActive = false;
+        let candlesLit = [true, true, true, true, true];
+        let lastBlowTime = 0;
+
+        const micPanel = document.getElementById('micPanel');
+        const meterPanel = document.getElementById('meterPanel');
+        const meterFill = document.getElementById('meterFill');
+        const percentSpan = document.getElementById('percent');
+        const micSelectDiv = document.getElementById('micSelectDiv');
+        const micSelect = document.getElementById('micSelect');
+        const micError = document.getElementById('micError');
+        const wishMessage = document.getElementById('wishMessage');
+
+        window.findMics = async function() {
+            try {
+                micError.innerHTML = '';
+                const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const mics = devices.filter(d => d.kind === 'audioinput');
+                
+                if (mics.length > 0) {
+                    micSelect.innerHTML = '';
+                    mics.forEach(mic => {
+                        const option = document.createElement('option');
+                        option.value = mic.deviceId;
+                        option.text = mic.label || `Микрофон ${mics.indexOf(mic) + 1}`;
+                        micSelect.appendChild(option);
+                    });
+                    
+                    micSelectDiv.style.display = 'block';
+                    document.getElementById('findMicsBtn').style.display = 'none';
+                }
+                
+                tempStream.getTracks().forEach(t => t.stop());
+                
+            } catch (err) {
+                micError.innerHTML = 'Ошибка доступа к микрофону. Разреши доступ.';
+            }
+        };
+
+        window.activateMic = async function() {
+            try {
+                const deviceId = micSelect.value;
+                
+                stream = await navigator.mediaDevices.getUserMedia({
+                    audio: deviceId ? { deviceId: { exact: deviceId } } : true
+                });
+                
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                await audioContext.resume();
+                
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                analyser.smoothingTimeConstant = 0.8;
+                
+                source = audioContext.createMediaStreamSource(stream);
+                source.connect(analyser);
+                
+                micActive = true;
+                micPanel.style.display = 'none';
+                meterPanel.style.display = 'block';
+                
+                const dataArray = new Uint8Array(analyser.frequencyBinCount);
+                
+                function checkBlow() {
+                    if (!analyser || !micActive) return;
+                    
+                    analyser.getByteFrequencyData(dataArray);
+                    
+                    let sum = 0;
+                    for (let i = 0; i < dataArray.length; i++) {
+                        sum += dataArray[i];
+                    }
+                    const avg = sum / dataArray.length;
+                    const normalized = Math.min(avg / 150, 1);
+                    
+                    meterFill.style.width = (normalized * 100) + '%';
+                    percentSpan.innerHTML = Math.round(normalized * 100) + '%';
+                    
+                    const now = Date.now();
+                    if (normalized > 0.15 && now - lastBlowTime > 300) {
+                        lastBlowTime = now;
+                        
+                        for (let i = 0; i < candlesLit.length; i++) {
+                            if (candlesLit[i]) {
+                                candlesLit[i] = false;
+                                document.getElementById(`flame${i}`).style.display = 'none';
+                                break;
+                            }
+                        }
+                        
+                        if (!candlesLit.includes(true)) {
+                            wishMessage.style.display = 'block';
+                        }
+                    }
+                    
+                    animationFrame = requestAnimationFrame(checkBlow);
+                }
+                
+                checkBlow();
+                
+            } catch (err) {
+                micError.innerHTML = 'Ошибка активации микрофона';
+            }
         };
     </script>
 </body>
